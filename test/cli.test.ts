@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'path';
-import { runScore, buildProgram } from '../src/cli';
+import { runScore, buildProgram, handleParseError, isJsonModeRequested } from '../src/cli';
 import { LLMJudgeSource } from '../src/sources/LLMJudgeSource';
 import type { RuleSource, RuleFinding } from '../src/sources/RuleSource';
 
@@ -180,6 +180,49 @@ describe('buildProgram (`slop-eval score --help` shape)', () => {
 
     expect(parseArg('42', undefined)).toBe(42);
     expect(() => parseArg('not-a-number', undefined)).toThrow(/--fail-below must be a number/);
+  });
+
+  it('isJsonModeRequested detects --json anywhere in argv, regardless of flag order', () => {
+    expect(isJsonModeRequested(['node', 'cli.js', 'score', '--json', '--fail-below', 'x'])).toBe(true);
+    expect(isJsonModeRequested(['node', 'cli.js', 'score', '--fail-below', 'x', '--json'])).toBe(true);
+    expect(isJsonModeRequested(['node', 'cli.js', 'score', '--fail-below', 'x'])).toBe(false);
+  });
+
+  it('handleParseError emits valid JSON (regression: bad --fail-below with --json must not leak plain text) when --json is present in argv', () => {
+    const localLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const localErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const code = handleParseError(
+        new Error('--fail-below must be a number, got "notanumber"'),
+        ['node', 'cli.js', 'score', '--json', '--screenshot', 'a.png', '--fail-below', 'notanumber'],
+      );
+      expect(code).toBe(2);
+      expect(localLogSpy).toHaveBeenCalledTimes(1);
+      const output = localLogSpy.mock.calls[0][0] as string;
+      const parsed = JSON.parse(output);
+      expect(parsed).toEqual({ error: '--fail-below must be a number, got "notanumber"' });
+      expect(localErrorSpy).not.toHaveBeenCalled();
+    } finally {
+      localLogSpy.mockRestore();
+      localErrorSpy.mockRestore();
+    }
+  });
+
+  it('handleParseError emits human-readable text (not JSON) when --json is absent from argv', () => {
+    const localLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const localErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const code = handleParseError(
+        new Error('--fail-below must be a number, got "notanumber"'),
+        ['node', 'cli.js', 'score', '--screenshot', 'a.png', '--fail-below', 'notanumber'],
+      );
+      expect(code).toBe(2);
+      expect(localErrorSpy).toHaveBeenCalledWith('Error: --fail-below must be a number, got "notanumber"');
+      expect(localLogSpy).not.toHaveBeenCalled();
+    } finally {
+      localLogSpy.mockRestore();
+      localErrorSpy.mockRestore();
+    }
   });
 
   it('the score subcommand action handler runs end-to-end via parseAsync and sets process.exitCode', async () => {

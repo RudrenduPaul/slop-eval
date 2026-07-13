@@ -1,0 +1,124 @@
+name: 'slop-eval'
+description: >-
+  Score AI-generated UI for genericness ("slop") using slop-eval's LLM-judge
+  rubric, and post the single most specific flagged finding as a PR comment.
+author: 'RudrenduPaul'
+branding:
+  icon: 'eye'
+  color: 'purple'
+
+inputs:
+  url:
+    description: >-
+      URL to score. In v0.1 this fetches raw HTML/text (no headless-browser
+      rendering) -- for a rendered-screenshot score, run slop-eval locally
+      with --screenshot instead and adapt this action.
+    required: true
+  fail-below:
+    description: >-
+      Exit code 1 (fail the check) if the composite score is below this
+      threshold (0-100). Leave unset to always pass and only report.
+    required: false
+    default: ''
+  rubric:
+    description: 'Rubric version to use (reads src/rubric/<name>.json in slop-eval-cli).'
+    required: false
+    default: 'v1'
+  github-token:
+    description: 'Token used to post the PR comment. Defaults to the workflow''s GITHUB_TOKEN.'
+    required: false
+    default: '${{ github.token }}'
+
+outputs:
+  composite-score:
+    description: 'The composite 0-100 slop-eval score.'
+    value: ${{ steps.score.outputs.composite-score }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Run slop-eval
+      id: score
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ env.ANTHROPIC_API_KEY }}
+      run: |
+        set -e
+        FAIL_BELOW_FLAG=""
+        if [ -n "${{ inputs.fail-below }}" ]; then
+          FAIL_BELOW_FLAG="--fail-below ${{ inputs.fail-below }}"
+        fi
+
+        set +e
+        npx --yes slop-eval-cli score \
+          --url "${{ inputs.url }}" \
+          --rubric "${{ inputs.rubric }}" \
+          --json \
+          $FAIL_BELOW_FLAG > slop-eval-result.json
+        SLOP_EXIT_CODE=$?
+        set -e
+
+        cat slop-eval-result.json
+
+        COMPOSITE_SCORE=$(node -p "JSON.parse(require('fs').readFileSync('slop-eval-result.json','utf-8')).compositeScore ?? 'N/A'")
+        echo "composite-score=$COMPOSITE_SCORE" >> "$GITHUB_OUTPUT"
+
+        if [ "$SLOP_EXIT_CODE" -eq 2 ]; then
+          echo "slop-eval failed to run (exit code 2) -- see output above."
+          exit 2
+        fi
+
+        echo "SLOP_EVAL_EXIT_CODE=$SLOP_EXIT_CODE" >> "$GITHUB_ENV"
+
+    - name: Post PR comment with the most specific flag
+      if: ${{ github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('slop-eval-result.json', 'utf-8'));
+
+          // Lead the comment with the single most specific flagged finding --
+          // per this project's devex review, a bare composite number invites
+          // "so what," a cited flag is the moment a developer trusts and
+          // acts on the tool. Prefer a real 'flag'; fall back to the lowest
+          // scored finding if nothing is explicitly flagged.
+          const flagged = report.findings.filter((f) => f.status === 'flag');
+          const candidates = flagged.length > 0
+            ? flagged
+            : report.findings.filter((f) => f.status !== 'not_scored');
+          const topFinding = candidates.length > 0
+            ? candidates.reduce((worst, f) => (f.score < worst.score ? f : worst))
+            : null;
+
+          const lines = [];
+          lines.push('### slop-eval');
+          if (topFinding) {
+            lines.push('');
+            lines.push(`**${topFinding.category}: ${topFinding.score}/10** -- ${topFinding.evidence}`);
+          }
+          lines.push('');
+          lines.push(`Composite score: **${report.compositeScore}/100** (rubric ${report.rubric})`);
+          lines.push('');
+          lines.push(`<sub>${report.disclaimer}</sub>`);
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: lines.join('\n'),
+          });
+
+    - name: Fail the check if below threshold
+      shell: bash
+      run: |
+        if [ "${SLOP_EVAL_EXIT_CODE:-0}" -eq 1 ]; then
+          echo "slop-eval score is below --fail-below threshold."
+          exit 1
+        fi

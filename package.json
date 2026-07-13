@@ -1,0 +1,59 @@
+{
+  "name": "slop-eval-cli",
+  "version": "0.1.0",
+  "description": "Scores AI-generated UI for genericness (\"slop\") using an LLM-judge rubric. Composable RuleSource plugin architecture designed to complement deterministic rule catalogs, not replace them.",
+  "keywords": [
+    "ai",
+    "ui",
+    "slop",
+    "eval",
+    "ci",
+    "quality-gate",
+    "llm-judge",
+    "design"
+  ],
+  "homepage": "https://github.com/RudrenduPaul/slop-eval#readme",
+  "bugs": {
+    "url": "https://github.com/RudrenduPaul/slop-eval/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RudrenduPaul/slop-eval.git"
+  },
+  "license": "Apache-2.0",
+  "author": "",
+  "bin": {
+    "slop-eval": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "files": [
+    "dist",
+    "src/rubric",
+    "action",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "lint": "eslint .",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
+    "commander": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/parser": "^8.63.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.7.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

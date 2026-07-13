@@ -156,12 +156,36 @@ export function buildProgram(): Command {
   return program;
 }
 
+/**
+ * Whether --json was requested, read directly from raw argv rather than
+ * commander's parsed options. Needed because some errors (e.g. --fail-below's
+ * custom coercion throwing on a non-numeric value) happen during commander's
+ * own argument parsing, before the `score` action handler -- and therefore
+ * before `runScore`'s `json` option is ever reached. Checking argv directly
+ * keeps every error path honest about the CLI's documented guarantee that
+ * --json always emits valid JSON on stdout, even on error paths that occur
+ * before our own option validation runs.
+ */
+export function isJsonModeRequested(argv: string[]): boolean {
+  return argv.includes('--json');
+}
+
+/**
+ * Handles an error thrown while commander parses/coerces arguments (before
+ * the `score` action handler runs), routing it through the same
+ * `printError` used by every other error path so --json mode is never
+ * bypassed. Exported so tests can exercise this without needing to invoke
+ * the process-level entry point below.
+ */
+export function handleParseError(err: Error, argv: string[]): number {
+  printError(err.message, isJsonModeRequested(argv));
+  return 2;
+}
+
 /* istanbul ignore next -- exercised via the built dist/cli.js in manual verification, not unit tests */
 if (require.main === module) {
   const program = buildProgram();
   program.parseAsync(process.argv).catch((err) => {
-    // eslint-disable-next-line no-console -- last-resort handler for errors commander itself couldn't route (e.g. bad --fail-below parse)
-    console.error(`Error: ${(err as Error).message}`);
-    process.exitCode = 2;
+    process.exitCode = handleParseError(err as Error, process.argv);
   });
 }

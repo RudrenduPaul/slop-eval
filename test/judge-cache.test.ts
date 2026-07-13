@@ -51,6 +51,18 @@ describe('judge-cache', () => {
     expect(fs.existsSync(path.join(nestedDir, 'hash-d.json'))).toBe(true);
   });
 
+  it('recomputes and overwrites a corrupted/unparseable cache entry instead of throwing', async () => {
+    const cachePath = path.join(tmpDir, 'hash-corrupt.json');
+    fs.writeFileSync(cachePath, '{ this is not valid json');
+    const computeFn = vi.fn().mockResolvedValue({ recomputed: true });
+
+    const result = await getCachedOrCompute('hash-corrupt', computeFn, tmpDir);
+
+    expect(computeFn).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ recomputed: true });
+    expect(JSON.parse(fs.readFileSync(cachePath, 'utf-8'))).toEqual({ recomputed: true });
+  });
+
   it('defaults to the .slop-eval-cache directory under the given cwd-relative path when no cacheDir is passed', async () => {
     // Use a relative path resolved against process.cwd() by passing a bare
     // relative dir name -- verifies the default-cacheDir resolution branch

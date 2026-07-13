@@ -209,7 +209,10 @@ describe('LLMJudgeSource', () => {
     const findings = await source.score({ url: 'https://example.com' });
 
     expect(findings).toHaveLength(3);
-    expect(fetchMock).toHaveBeenCalledWith('https://example.com');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.com',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
     fetchMock.mockRestore();
   });
 
@@ -231,6 +234,48 @@ describe('LLMJudgeSource', () => {
     const source = new LLMJudgeSource('v1', tmpCacheDir);
 
     await expect(source.score({ url: 'https://unreachable.example' })).rejects.toThrow(/Could not fetch URL/);
+    fetchMock.mockRestore();
+  });
+
+  it('aborts and reports a clear timeout error when the URL fetch never settles within the deadline', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((_url, opts?: RequestInit) => {
+        // Simulates a hung server: the fetch promise never resolves on its
+        // own, only rejecting if/when the caller's AbortSignal fires -- the
+        // same real behavior as Node's fetch when a request is aborted.
+        return new Promise((_resolve, reject) => {
+          opts?.signal?.addEventListener('abort', () => {
+            const abortErr = new Error('This operation was aborted');
+            abortErr.name = 'AbortError';
+            reject(abortErr);
+          });
+        });
+      });
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    const pending = expect(source.score({ url: 'https://slow.example' })).rejects.toThrow(
+      /timed out after/,
+    );
+    await vi.advanceTimersByTimeAsync(30_000);
+    await pending;
+
+    fetchMock.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('rejects a URL response whose Content-Length exceeds the size cap without reading the body', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: (name: string) => (name === 'content-length' ? String(50 * 1024 * 1024) : null) },
+      text: async () => 'should not be read',
+    } as unknown as Response);
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'https://huge.example' })).rejects.toThrow(/exceeds the .* cap/);
     fetchMock.mockRestore();
   });
 

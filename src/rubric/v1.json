@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "description": "slop-eval v0.1 public rubric. Scores AI-generated UI on three holistic categories the LLM judge evaluates directly from a screenshot (preferred) or raw page markup (fallback, v0.1 only). Each category is scored 0-10 with a required, specific evidence string -- a score with no citation is not a valid finding. This file is versioned and immutable: publish a new rubric/v2.json rather than editing this one, so historical scores always record which rubric produced them.",
+  "categories": [
+    {
+      "id": "layout-novelty",
+      "name": "Layout novelty",
+      "description": "Does the page's structural layout (section ordering, grid/column structure, hero/nav/footer arrangement) show a distinctive composition, or does it match a generic, ubiquitous template (e.g. hero + 3-feature-cards + testimonial + footer) seen across many AI-generated sites? Low scores must cite the specific generic pattern matched; high scores must cite the specific structural choice that breaks from it."
+    },
+    {
+      "id": "visual-identity-distinctiveness",
+      "name": "Visual-identity distinctiveness",
+      "description": "Does the color palette, typography, and iconography feel like a deliberate, specific brand identity, or does it default to common AI-generated visual tells (e.g. a purple/indigo gradient on a white background, Inter/system-font body text, generic line icons)? Low scores must cite the specific generic visual tell observed; high scores must cite the specific distinctive choice."
+    },
+    {
+      "id": "component-pattern-novelty",
+      "name": "Component-pattern novelty",
+      "description": "Do individual components (cards, buttons, forms, navigation) show original interaction/visual patterns, or do they reproduce default component-library output with no customization? Low scores must cite the specific stock component pattern observed; high scores must cite the specific customization or novel pattern."
+    }
+  ]
+}

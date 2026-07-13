@@ -47,17 +47,27 @@ runs:
       shell: bash
       env:
         ANTHROPIC_API_KEY: ${{ env.ANTHROPIC_API_KEY }}
+        # Passed via env rather than interpolated straight into the script
+        # body ("${{ inputs.foo }}" inline in `run:`) -- GitHub substitutes
+        # `${{ }}` expressions as raw text before bash ever sees the script,
+        # so a value containing something like `"; rm -rf /; #` would break
+        # out of the quotes and execute as shell. Referencing them as
+        # ordinary env vars ($INPUT_URL) lets bash's normal quoting handle
+        # arbitrary content safely instead.
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_RUBRIC: ${{ inputs.rubric }}
+        INPUT_FAIL_BELOW: ${{ inputs.fail-below }}
       run: |
         set -e
         FAIL_BELOW_FLAG=""
-        if [ -n "${{ inputs.fail-below }}" ]; then
-          FAIL_BELOW_FLAG="--fail-below ${{ inputs.fail-below }}"
+        if [ -n "$INPUT_FAIL_BELOW" ]; then
+          FAIL_BELOW_FLAG="--fail-below $INPUT_FAIL_BELOW"
         fi
 
         set +e
         npx --yes slop-eval-cli score \
-          --url "${{ inputs.url }}" \
-          --rubric "${{ inputs.rubric }}" \
+          --url "$INPUT_URL" \
+          --rubric "$INPUT_RUBRIC" \
           --json \
           $FAIL_BELOW_FLAG > slop-eval-result.json
         SLOP_EXIT_CODE=$?
@@ -108,12 +118,23 @@ runs:
           lines.push('');
           lines.push(`<sub>${report.disclaimer}</sub>`);
 
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.issue.number,
-            body: lines.join('\n'),
-          });
+          try {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: lines.join('\n'),
+            });
+          } catch (err) {
+            // A PR-comment failure (missing pull-requests: write permission,
+            // a fork PR whose token is read-only, secondary rate limiting)
+            // is not a slop-eval scoring failure -- don't fail the whole
+            // check over it, since the actual score/fail-below verdict
+            // already ran successfully in the previous step. Warn instead
+            // so it's visible in the job log and annotations without
+            // turning an unrelated GitHub API hiccup into a red check.
+            core.warning(`slop-eval could not post the PR comment: ${err.message}`);
+          }
 
     - name: Fail the check if below threshold
       shell: bash

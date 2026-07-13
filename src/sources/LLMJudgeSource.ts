@@ -92,6 +92,12 @@ interface JudgeCategoryResult {
 /** Default model per this repo's rubric task: a rubric-scoring judge is a bounded classification/extraction call against a fixed rubric, not open-ended reasoning, so a mid-tier model is the right cost/quality default for a BYO-key tool invoked repeatedly in CI. Override with ANTHROPIC_MODEL for teams that want a more capable judge. */
 const DEFAULT_MODEL = 'claude-sonnet-5';
 
+/** Hard cap on how long --url mode will wait for the page fetch. Without this, a target URL that never completes the response (a hung dev-preview deploy, a slow proxy, a streaming endpoint that never closes) hangs the whole CI job until the runner's own top-level timeout kills it -- minutes to hours later -- instead of failing fast with an actionable error. Override with SLOP_EVAL_FETCH_TIMEOUT_MS for slower targets. */
+const URL_FETCH_TIMEOUT_MS = Number(process.env.SLOP_EVAL_FETCH_TIMEOUT_MS) || 30_000;
+
+/** Best-effort cap on response body size for --url mode, checked against the Content-Length header when the server reports one. This does not stop a server that lies about or omits Content-Length while streaming an unbounded body -- closing that gap fully requires reading the body incrementally with a hard byte cap, which is out of scope for this fix -- but it does stop the common case of an honestly-huge page (a large export, a misrouted binary/video asset) from being read fully into memory before the 20000-char slice ever helps. */
+const URL_MAX_CONTENT_LENGTH_BYTES = 10 * 1024 * 1024;
+
 /** Resolves the rubric file path for `rubricName`, relative to the package root's src/rubric/ directory (works both from ts-node against source and from dist/ once built, as long as src/ ships alongside dist/ -- see package.json's `files` field). */
 function resolveRubricPath(rubricName: string): string {
   // __dirname is src/sources (source) or dist/sources (compiled) -- either
@@ -214,12 +220,31 @@ export class LLMJudgeSource implements RuleSource {
     if (input.url) {
       let text: string;
       try {
-        const res = await fetch(input.url);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
+        let res: Response;
+        try {
+          res = await fetch(input.url, { signal: controller.signal });
+        } finally {
+          clearTimeout(timer);
+        }
         if (!res.ok) {
           throw new Error(`HTTP ${res.status} ${res.statusText}`);
         }
+        const contentLength = Number(res.headers?.get?.('content-length'));
+        if (Number.isFinite(contentLength) && contentLength > URL_MAX_CONTENT_LENGTH_BYTES) {
+          throw new Error(
+            `response body (${contentLength} bytes) exceeds the ${URL_MAX_CONTENT_LENGTH_BYTES}-byte cap for --url mode -- ` +
+              'render the page yourself and pass --screenshot instead.',
+          );
+        }
         text = await res.text();
       } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          throw new Error(
+            `Could not fetch URL ${input.url}: timed out after ${URL_FETCH_TIMEOUT_MS}ms`,
+          );
+        }
         throw new Error(`Could not fetch URL ${input.url}: ${(err as Error).message}`);
       }
       const hash = crypto

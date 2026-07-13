@@ -40,8 +40,21 @@ export async function getCachedOrCompute<T>(
   const cachePath = path.join(resolvedDir, `${hash}.json`);
 
   if (fs.existsSync(cachePath)) {
-    const raw = fs.readFileSync(cachePath, 'utf-8');
-    return JSON.parse(raw) as T;
+    try {
+      const raw = fs.readFileSync(cachePath, 'utf-8');
+      return JSON.parse(raw) as T;
+    } catch (err) {
+      // A cache entry that exists but can't be read/parsed (truncated by a
+      // crash that raced the temp-file-then-rename write, corrupted on
+      // disk, or left over from an incompatible earlier schema version)
+      // must not permanently break every future run against this hash --
+      // treat it as a miss and recompute rather than throwing, and fall
+      // through below to overwrite it with a good entry.
+      // eslint-disable-next-line no-console -- surfacing a real disk-state warning, not a debug log
+      console.error(
+        `slop-eval: cache entry at ${cachePath} is unreadable or corrupted (${(err as Error).message}) -- recomputing instead of failing.`,
+      );
+    }
   }
 
   const result = await computeFn();

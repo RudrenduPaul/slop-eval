@@ -89,8 +89,8 @@ interface JudgeCategoryResult {
   evidence: string;
 }
 
-/** Default model per this repo's rubric task: a rubric-scoring judge is a straightforward classification/extraction call, but per this project's model-selection guidance we default to the most capable model and let cost-conscious CI users override it explicitly. */
-const DEFAULT_MODEL = 'claude-opus-4-8';
+/** Default model per this repo's rubric task: a rubric-scoring judge is a bounded classification/extraction call against a fixed rubric, not open-ended reasoning, so a mid-tier model is the right cost/quality default for a BYO-key tool invoked repeatedly in CI. Override with ANTHROPIC_MODEL for teams that want a more capable judge. */
+const DEFAULT_MODEL = 'claude-sonnet-5';
 
 /** Resolves the rubric file path for `rubricName`, relative to the package root's src/rubric/ directory (works both from ts-node against source and from dist/ once built, as long as src/ ships alongside dist/ -- see package.json's `files` field). */
 function resolveRubricPath(rubricName: string): string {

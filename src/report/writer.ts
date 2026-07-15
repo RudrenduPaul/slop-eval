@@ -3,9 +3,9 @@
  * human-readable terminal report or a structured JSON object, depending on
  * the caller's --json flag.
  *
- * Per [redacted] anti-sycophancy rule #3, every human-readable report must
- * state plainly that the score is a heuristic quality signal, not a
- * certification -- never implying "not AI-generated" or "definitely slop."
+ * Every human-readable report must state plainly that the score is a
+ * heuristic quality signal, not a certification -- never implying
+ * "not AI-generated" or "definitely slop."
  */
 
 import type { CompositeResult } from '../scorer/composite';

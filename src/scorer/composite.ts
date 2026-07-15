@@ -3,9 +3,8 @@
  * score and a flat findings list for the report writer.
  *
  * This module (along with LLMJudgeSource) directly produces the CI-gate
- * verdict, so [redacted] engineering standards require 95%+ test coverage
- * here -- a bug in this averaging logic is a wrong CI decision, not just a
- * cosmetic report bug.
+ * verdict, so it carries a 95%+ test coverage requirement -- a bug in this
+ * averaging logic is a wrong CI decision, not just a cosmetic report bug.
  */
 
 import type { RuleFinding, RuleSource, ScoreInput } from '../sources/RuleSource';

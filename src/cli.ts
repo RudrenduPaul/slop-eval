@@ -6,7 +6,7 @@
  * ("slop") using the LLM-judge rubric, plus the (v0.1 stub) screenshot-diff
  * source.
  *
- * Exit codes (per [redacted] / [redacted]):
+ * Exit codes:
  *   0 -- ran successfully, and either no --fail-below threshold was given or
  *        the composite score met it.
  *   1 -- ran successfully, but the composite score is below --fail-below.

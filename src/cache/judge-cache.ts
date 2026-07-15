@@ -1,10 +1,9 @@
 /**
  * Content-hash cache for LLM-judge scores. Identical input (same screenshot
  * bytes, or same URL+fetched-content bytes) must never trigger a second LLM
- * API call -- this is a correctness requirement (see [redacted] "Judge-cache
- * correctness" engineering standard), not just a cost optimization: without
- * it, re-running slop-eval against an unchanged PR could flap a CI gate if
- * the LLM's output has any run-to-run variance.
+ * API call -- this is a correctness requirement, not just a cost optimization:
+ * without it, re-running slop-eval against an unchanged PR could flap a CI
+ * gate if the LLM's output has any run-to-run variance.
  *
  * Cache storage is a local file cache by default (`.slop-eval-cache/<hash>.json`
  * relative to the current working directory), pluggable for a future hosted

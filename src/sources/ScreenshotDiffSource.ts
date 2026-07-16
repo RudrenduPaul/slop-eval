@@ -1,9 +1,9 @@
 /**
  * ScreenshotDiffSource -- v0.1 STUB.
  *
- * Scope decision (locked at [redacted], 2026-07-13): this source ships as a
- * real RuleSource interface implementation, but with no corpus and no real
- * diff algorithm behind it in v0.1. Hand-seeding an arbitrary 20-30-example
+ * Scope decision: this source ships as a real RuleSource interface
+ * implementation, but with no corpus and no real diff algorithm behind it in
+ * v0.1. Hand-seeding an arbitrary 20-30-example
  * corpus now would produce an unvalidated, made-up signal -- worse than no
  * signal. Corpus-backed comparison is real v0.2 scope once genuine usage
  * produces labeled examples worth diffing against.
@@ -28,7 +28,7 @@ export class ScreenshotDiffSource implements RuleSource {
         evidence:
           'slop-eval v0.1 ships this RuleSource as an interface only -- there is no ' +
           'seeded comparison corpus yet, so no real screenshot-diff score can be ' +
-          'produced. This is documented v0.1 scope (see [redacted], 2026-07-13), not a ' +
+          'produced. This is documented v0.1 scope, not a ' +
           'bug: a hand-seeded, unvalidated corpus would produce a less honest signal ' +
           'than reporting "not scored." Corpus-backed diffing against real, labeled ' +
           'examples is planned for v0.2.',

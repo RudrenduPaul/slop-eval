@@ -11,8 +11,8 @@
  *     sent to the judge as base64, giving it a real rendered view of the UI.
  *   - `url` is a documented v0.1 fallback: this tool does not bundle a
  *     headless browser (Playwright/Puppeteer) to render the page into a
- *     screenshot -- that's out of scope for v0.1 by design (see [redacted],
- *     2026-07-13). Instead the raw HTML/text response body is fetched and
+ *     screenshot -- that's an intentional v0.1 scope decision. Instead the
+ *     raw HTML/text response body is fetched and
  *     given to the judge as text. The judge can reason about markup, inline
  *     styles, and copy, but not the actual rendered visual layout -- so
  *     --screenshot is the stronger signal. This limitation is also stated in
@@ -20,7 +20,7 @@
  *
  * Every real judge call is wrapped through the content-hash cache in
  * src/cache/judge-cache.ts, so identical input never triggers a second API
- * call (see [redacted] judge-cache correctness standard).
+ * call.
  *
  * Along with composite.ts, this module directly produces the CI-gate
  * verdict, so it carries a 95%+ coverage requirement -- the real Anthropic

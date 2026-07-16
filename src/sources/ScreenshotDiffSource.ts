@@ -2,8 +2,8 @@
  * ScreenshotDiffSource -- v0.1 STUB.
  *
  * Scope decision: this source ships as a real RuleSource interface
- * implementation, but with no corpus and no real
- * diff algorithm behind it in v0.1. Hand-seeding an arbitrary 20-30-example
+ * implementation, but with no corpus and no real diff algorithm behind it in
+ * v0.1. Hand-seeding an arbitrary 20-30-example
  * corpus now would produce an unvalidated, made-up signal -- worse than no
  * signal. Corpus-backed comparison is real v0.2 scope once genuine usage
  * produces labeled examples worth diffing against.

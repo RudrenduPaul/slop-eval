@@ -23,7 +23,7 @@ export type RuleFindingStatus = 'pass' | 'flag' | 'not_scored';
  * `evidence` must always be a specific, cited reason -- e.g. "matches a
  * hero+3-card+footer pattern also seen in the fixture corpus", never a
  * generic "layout could be more original." A finding with no citation is
- * not shippable (see [redacted] anti-sycophancy rule #2).
+ * not shippable.
  */
 export interface RuleFinding {
   /** Stable identifier for this specific rule, e.g. "llm-judge.layout-novelty". */

@@ -95,9 +95,9 @@ runs:
           const report = JSON.parse(fs.readFileSync('slop-eval-result.json', 'utf-8'));
 
           // Lead the comment with the single most specific flagged finding --
-          // per this project's [redacted], a bare composite number invites
-          // "so what," a cited flag is the moment a developer trusts and
-          // acts on the tool. Prefer a real 'flag'; fall back to the lowest
+          // a bare composite number invites "so what," a cited flag is the
+          // moment a developer trusts and acts on the tool. Prefer a real
+          // 'flag'; fall back to the lowest
           // scored finding if nothing is explicitly flagged.
           const flagged = report.findings.filter((f) => f.status === 'flag');
           const candidates = flagged.length > 0

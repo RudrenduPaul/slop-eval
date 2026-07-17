@@ -10,9 +10,9 @@ Score AI-generated UI for genericness with an LLM judge, so a CI check catches t
 slop-eval score --screenshot ./preview.png --json
 ```
 
-## Not on npm yet
+## Two distributions: npm (live) and Python (publish in progress)
 
-`slop-eval-cli` has not been published to npm. `npx slop-eval-cli` will not work today. Until the first release ships, run it from a local clone (see [Quickstart](#quickstart) below). This README will drop this notice the moment `npm install -g slop-eval-cli` is real.
+`slop-eval-cli` is live on npm -- `npx slop-eval-cli score ...` works today (see [Quickstart](#quickstart) below). A genuine Python port also ships in this repo under [`python/`](./python/) (`pip install slop-eval-cli`, package `slop_eval`), built and tested (56/56 tests) against the same rubric and Anthropic judge prompt. Its first PyPI publish is in progress -- this notice will drop the moment `pip install slop-eval-cli` is live. See [`python/README.md`](./python/README.md) for Python-specific usage in the meantime.
 
 ## Why this exists, and what it isn't
 
@@ -171,9 +171,13 @@ Every score is graded against `src/rubric/v1.json`, a real, versioned, inspectab
 - **v0.1 (this release):** LLM-judge scoring, CLI, GitHub Action, content-hash caching, `--json` mode.
 - **v0.2:** `ScreenshotDiffSource` becomes real once a genuine labeled corpus exists. An Impeccable-catalog adapter, pending a license check. Explicit `rescore --rubric v2` command so a rubric bump is never silent.
 
+## Security
+
+`ANTHROPIC_API_KEY` is read from the environment only, is never logged, and is never written to the content-hash cache -- see `SECURITY.md` for the full policy and the private disclosure process.
+
 ## Contributing
 
-Issues and PRs welcome, see `CONTRIBUTING.md`. New `RuleSource` implementations are the highest-leverage contribution: the plugin interface exists specifically so a new detection method doesn't require touching the composite scorer.
+Issues and PRs welcome, see `CONTRIBUTING.md` (covers both the npm and Python packages). New `RuleSource` implementations are the highest-leverage contribution: the plugin interface exists specifically so a new detection method doesn't require touching the composite scorer.
 
 ## License
 

@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "slop-eval-cli"
+version = "0.1.0"
+description = "Scores AI-generated UI for genericness (\"slop\") using an Anthropic LLM-judge rubric, with a --json mode for CI and agent quality gates."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+authors = [
+  { name = "Rudrendu Paul" },
+  { name = "Sourav Nandy" },
+]
+keywords = ["ai", "ui", "slop", "eval", "ci", "quality-gate", "llm-judge", "design", "anthropic"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = [
+  "anthropic>=0.40.0,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0,<9",
+  "build>=1.0,<2",
+  "twine>=5.0,<7",
+]
+
+[project.urls]
+Homepage = "https://github.com/RudrenduPaul/slop-eval"
+Repository = "https://github.com/RudrenduPaul/slop-eval"
+"Bug Tracker" = "https://github.com/RudrenduPaul/slop-eval/issues"
+Changelog = "https://github.com/RudrenduPaul/slop-eval/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/RudrenduPaul/slop-eval/blob/main/python/docs/getting-started.md"
+"Author - Rudrendu Paul" = "https://github.com/RudrenduPaul"
+"Author - Sourav Nandy" = "https://github.com/Sourav-nandy-ai"
+
+[project.scripts]
+slop-eval = "slop_eval.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slop_eval"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/slop_eval",
+  "tests",
+  "README.md",
+  "LICENSE",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

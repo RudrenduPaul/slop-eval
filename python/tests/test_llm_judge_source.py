@@ -60,6 +60,23 @@ def patch_anthropic(monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def patch_dns_resolution(monkeypatch):
+    """
+    _assert_url_is_safe_to_fetch resolves the URL's hostname via
+    socket.getaddrinfo before urlopen is ever reached. Stub it to a
+    public-looking IP by default so the existing fake `.example` hostnames
+    below keep working without a real DNS lookup -- individual SSRF tests
+    override this per-test to simulate a private/internal resolution.
+    """
+
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(llm_judge_module.socket, "getaddrinfo", fake_getaddrinfo)
+    yield
+
+
 class TestLoadRubric:
     def test_loads_the_v1_rubric_with_its_3_documented_categories(self):
         rubric = load_rubric("v1")
@@ -73,6 +90,10 @@ class TestLoadRubric:
     def test_raises_rubric_load_error_for_a_rubric_name_that_does_not_exist(self):
         with pytest.raises(RubricLoadError):
             load_rubric("does-not-exist")
+
+    def test_raises_rubric_load_error_for_a_rubric_name_with_path_traversal_segments(self):
+        with pytest.raises(RubricLoadError, match="is invalid"):
+            load_rubric("../../../etc/passwd")
 
     def test_raises_rubric_load_error_for_malformed_json(self, tmp_path):
         rubric_dir = Path(llm_judge_module.__file__).parent.parent / "rubric"
@@ -290,6 +311,47 @@ def test_rejects_a_url_response_whose_content_length_exceeds_the_size_cap(monkey
 
     with pytest.raises(RuntimeError, match="exceeds the"):
         source.score(ScoreInput(url="https://huge.example"))
+
+
+def test_rejects_a_file_url_without_ever_calling_urlopen(monkeypatch, tmp_path):
+    def fake_urlopen(req, timeout=None):
+        raise AssertionError("urlopen should never be reached for a blocked scheme")
+
+    monkeypatch.setattr(llm_judge_module.urllib.request, "urlopen", fake_urlopen)
+    source = LLMJudgeSource("v1", str(tmp_path))
+
+    with pytest.raises(RuntimeError, match="only http/https URLs"):
+        source.score(ScoreInput(url="file:///etc/passwd"))
+
+
+def test_rejects_a_url_that_resolves_to_a_loopback_address(monkeypatch, tmp_path):
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))]
+
+    def fake_urlopen(req, timeout=None):
+        raise AssertionError("urlopen should never be reached once the SSRF guard rejects the host")
+
+    monkeypatch.setattr(llm_judge_module.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(llm_judge_module.urllib.request, "urlopen", fake_urlopen)
+    source = LLMJudgeSource("v1", str(tmp_path))
+
+    with pytest.raises(RuntimeError, match="private/internal address"):
+        source.score(ScoreInput(url="https://internal.example"))
+
+
+def test_rejects_a_url_that_resolves_to_the_cloud_metadata_address(monkeypatch, tmp_path):
+    def fake_getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 0))]
+
+    def fake_urlopen(req, timeout=None):
+        raise AssertionError("urlopen should never be reached once the SSRF guard rejects the host")
+
+    monkeypatch.setattr(llm_judge_module.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(llm_judge_module.urllib.request, "urlopen", fake_urlopen)
+    source = LLMJudgeSource("v1", str(tmp_path))
+
+    with pytest.raises(RuntimeError, match="private/internal address"):
+        source.score(ScoreInput(url="https://metadata.example"))
 
 
 def test_raises_when_neither_url_nor_screenshot_path_is_provided(tmp_path):

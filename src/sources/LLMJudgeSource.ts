@@ -30,6 +30,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as dns from 'dns';
+import * as net from 'net';
 import Anthropic from '@anthropic-ai/sdk';
 import type { RuleFinding, RuleSource, ScoreInput } from './RuleSource';
 import { getCachedOrCompute } from '../cache/judge-cache';
@@ -98,8 +100,19 @@ const URL_FETCH_TIMEOUT_MS = Number(process.env.SLOP_EVAL_FETCH_TIMEOUT_MS) || 3
 /** Best-effort cap on response body size for --url mode, checked against the Content-Length header when the server reports one. This does not stop a server that lies about or omits Content-Length while streaming an unbounded body -- closing that gap fully requires reading the body incrementally with a hard byte cap, which is out of scope for this fix -- but it does stop the common case of an honestly-huge page (a large export, a misrouted binary/video asset) from being read fully into memory before the 20000-char slice ever helps. */
 const URL_MAX_CONTENT_LENGTH_BYTES = 10 * 1024 * 1024;
 
+// --rubric is joined straight into a filesystem path below; restricting it
+// to a bare name (no separators or ".." segments) before that join closes
+// off path traversal for any caller that ever wires --rubric to something
+// other than a maintainer-chosen local flag.
+const RUBRIC_NAME_PATTERN = /^[\w-]+$/;
+
 /** Resolves the rubric file path for `rubricName`, relative to the package root's src/rubric/ directory (works both from ts-node against source and from dist/ once built, as long as src/ ships alongside dist/ -- see package.json's `files` field). */
 function resolveRubricPath(rubricName: string): string {
+  if (!RUBRIC_NAME_PATTERN.test(rubricName)) {
+    throw new RubricLoadError(
+      `Rubric name "${rubricName}" is invalid -- expected letters, digits, "-", or "_" only.`,
+    );
+  }
   // __dirname is src/sources (source) or dist/sources (compiled) -- either
   // way, ../../src/rubric is the project's src/rubric directory.
   return path.resolve(__dirname, '..', '..', 'src', 'rubric', `${rubricName}.json`);
@@ -153,6 +166,82 @@ export function loadRubric(rubricName: string): Rubric {
   }
 
   return parsed as Rubric;
+}
+
+/**
+ * Blocks SSRF into internal/cloud-metadata targets before --url mode fetches
+ * anything. This tool is meant to be embedded in other people's CI (via the
+ * bundled GitHub Action), where --url can end up wired to PR-derived input --
+ * without this, a crafted target (a private RFC1918 address, or the
+ * 169.254.169.254 cloud-metadata endpoint, which falls under the link-local
+ * block below) would be fetched and its response handed to the LLM judge,
+ * with the risk of sensitive content resurfacing in the JSON output.
+ *
+ * This validates the resolved IP at lookup time, not at connection time, so
+ * it does not fully close a DNS-rebinding attack (a name that resolves to a
+ * public IP during this check but a private one when Node actually
+ * connects) -- fully closing that requires a custom dispatcher that
+ * re-validates the IP it connects to, which is out of scope for this fix.
+ */
+async function assertUrlIsSafeToFetch(rawUrl: string): Promise<void> {
+  // Callers wrap thrown messages as `Could not fetch URL ${url}: ${message}`
+  // -- keep messages here to just the reason, not a re-stated "Could not
+  // fetch URL" prefix.
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('not a valid URL.');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`only http/https URLs are supported for --url mode (got "${parsed.protocol}").`);
+  }
+  const hostname = parsed.hostname;
+  if (!hostname || hostname.toLowerCase() === 'metadata.google.internal') {
+    throw new Error(`host "${hostname}" is not allowed for --url mode.`);
+  }
+  let addresses: string[];
+  try {
+    addresses = (await dns.promises.lookup(hostname, { all: true })).map((a) => a.address);
+  } catch (err) {
+    throw new Error(`could not resolve host "${hostname}": ${(err as Error).message}`);
+  }
+  for (const address of addresses) {
+    if (isPrivateOrReservedIp(address)) {
+      throw new Error(
+        `host "${hostname}" resolves to a private/internal address (${address}), which is not allowed for --url mode.`,
+      );
+    }
+  }
+}
+
+function isPrivateOrReservedIp(address: string): boolean {
+  if (net.isIPv4(address)) {
+    const [a, b] = address.split('.').map(Number);
+    if (a === 127) return true; // loopback
+    if (a === 10) return true; // RFC1918 private
+    if (a === 172 && b >= 16 && b <= 31) return true; // RFC1918 private
+    if (a === 192 && b === 168) return true; // RFC1918 private
+    if (a === 169 && b === 254) return true; // link-local, incl. cloud metadata (169.254.169.254)
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT (RFC6598)
+    if (a === 0) return true; // "this network"
+    if (a >= 224) return true; // multicast + reserved
+    return false;
+  }
+  if (net.isIPv6(address)) {
+    const lower = address.toLowerCase();
+    if (lower === '::1' || lower === '::') return true; // loopback / unspecified
+    if (lower.startsWith('fe8') || lower.startsWith('fe9') || lower.startsWith('fea') || lower.startsWith('feb')) {
+      return true; // link-local fe80::/10
+    }
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique local fc00::/7
+    if (lower.startsWith('::ffff:')) {
+      const mapped = lower.slice('::ffff:'.length);
+      if (net.isIPv4(mapped)) return isPrivateOrReservedIp(mapped);
+    }
+    return false;
+  }
+  return true; // unrecognized address format -- fail closed
 }
 
 export class LLMJudgeSource implements RuleSource {
@@ -220,6 +309,7 @@ export class LLMJudgeSource implements RuleSource {
     if (input.url) {
       let text: string;
       try {
+        await assertUrlIsSafeToFetch(input.url);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
         let res: Response;

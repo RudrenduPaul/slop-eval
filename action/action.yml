@@ -38,7 +38,7 @@ runs:
   using: 'composite'
   steps:
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version: '20'
 
@@ -65,7 +65,12 @@ runs:
         fi
 
         set +e
-        npx --yes slop-eval-cli score \
+        # Pinned to an exact published version rather than @latest -- every
+        # consumer of this action would otherwise silently pull whatever npm
+        # currently serves as slop-eval-cli's latest tag on each run, so a
+        # compromised publish would propagate to every downstream CI using
+        # this action instantly and without any diff here. Bump deliberately.
+        npx --yes slop-eval-cli@0.1.0 score \
           --url "$INPUT_URL" \
           --rubric "$INPUT_RUBRIC" \
           --json \
@@ -87,7 +92,7 @@ runs:
 
     - name: Post PR comment with the most specific flag
       if: ${{ github.event_name == 'pull_request' }}
-      uses: actions/github-script@v7
+      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
       with:
         github-token: ${{ inputs.github-token }}
         script: |

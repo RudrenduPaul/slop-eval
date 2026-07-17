@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as dns from 'dns';
 
 // Mock the Anthropic SDK before importing LLMJudgeSource so the real network
 // client is never constructed. Every test in this file must never make a
@@ -42,17 +43,28 @@ describe('LLMJudgeSource', () => {
   let tmpCacheDir: string;
   const originalKey = process.env.ANTHROPIC_API_KEY;
 
+  // Every URL-mode test resolves through the SSRF guard's dns.promises.lookup
+  // call before the mocked fetch ever runs. Stub it to a public-looking IP by
+  // default so the existing fake `.example` hostnames keep working without a
+  // real DNS lookup -- individual SSRF tests below override this per-test to
+  // simulate a private/internal resolution instead.
+  let dnsLookupMock: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     createMock.mockReset();
     constructorMock.mockReset();
     tmpCacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slop-eval-llm-test-'));
     process.env.ANTHROPIC_API_KEY = 'test-key-not-real';
+    dnsLookupMock = vi
+      .spyOn(dns.promises, 'lookup')
+      .mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
   });
 
   afterEach(() => {
     fs.rmSync(tmpCacheDir, { recursive: true, force: true });
     if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = originalKey;
+    dnsLookupMock.mockRestore();
   });
 
   describe('loadRubric', () => {
@@ -68,6 +80,11 @@ describe('LLMJudgeSource', () => {
 
     it('throws RubricLoadError for a rubric name that does not exist', () => {
       expect(() => loadRubric('does-not-exist')).toThrow(RubricLoadError);
+    });
+
+    it('throws RubricLoadError for a rubric name containing path-traversal segments', () => {
+      expect(() => loadRubric('../../../etc/passwd')).toThrow(RubricLoadError);
+      expect(() => loadRubric('../../../etc/passwd')).toThrow(/is invalid/);
     });
 
     it('throws RubricLoadError when the rubric path exists but cannot be read as a file', () => {
@@ -276,6 +293,127 @@ describe('LLMJudgeSource', () => {
     const source = new LLMJudgeSource('v1', tmpCacheDir);
 
     await expect(source.score({ url: 'https://huge.example' })).rejects.toThrow(/exceeds the .* cap/);
+    fetchMock.mockRestore();
+  });
+
+  it('rejects a file:// URL without ever calling fetch (blocks local-file-read via --url)', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'file:///etc/passwd' })).rejects.toThrow(/only http\/https URLs/);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('rejects a URL that resolves to a loopback/private address (SSRF guard) without calling fetch', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '127.0.0.1', family: 4 }] as never);
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'https://internal.example' })).rejects.toThrow(
+      /private\/internal address/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('rejects a URL that resolves to the cloud-metadata link-local address without calling fetch', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '169.254.169.254', family: 4 }] as never);
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'https://metadata.example' })).rejects.toThrow(
+      /private\/internal address/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('rejects an unparseable URL string before any DNS lookup or fetch', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'not a url at all' })).rejects.toThrow(/not a valid URL/);
+    expect(dnsLookupMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('rejects the metadata.google.internal hostname directly, without a DNS lookup', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'http://metadata.google.internal/' })).rejects.toThrow(
+      /is not allowed for --url mode/,
+    );
+    expect(dnsLookupMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('wraps a DNS resolution failure in a clear "could not resolve host" error', async () => {
+    dnsLookupMock.mockRejectedValue(new Error('ENOTFOUND'));
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'https://does-not-resolve.example' })).rejects.toThrow(
+      /could not resolve host/,
+    );
+  });
+
+  it.each([
+    ['10.0.0.5', 'RFC1918 10.0.0.0/8'],
+    ['172.20.3.1', 'RFC1918 172.16.0.0/12'],
+    ['192.168.1.1', 'RFC1918 192.168.0.0/16'],
+    ['100.64.0.1', 'CGNAT 100.64.0.0/10'],
+    ['0.0.0.1', '"this network" 0.0.0.0/8'],
+    ['224.0.0.1', 'multicast/reserved 224.0.0.0/4+'],
+  ])('rejects a resolved IPv4 address in the %s range (%s)', async (address) => {
+    dnsLookupMock.mockResolvedValue([{ address, family: 4 }] as never);
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'https://blocked-range.example' })).rejects.toThrow(
+      /private\/internal address/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it.each([
+    ['::1', 'IPv6 loopback'],
+    ['::', 'IPv6 unspecified'],
+    ['fe80::1', 'IPv6 link-local fe80::/10'],
+    ['fc00::1', 'IPv6 unique-local fc00::/7'],
+    ['fd12:3456:789a::1', 'IPv6 unique-local fd00::/8'],
+    ['::ffff:127.0.0.1', 'IPv4-mapped IPv6 loopback'],
+    ['::ffff:10.1.2.3', 'IPv4-mapped IPv6 RFC1918'],
+  ])('rejects a resolved IPv6 address (%s -- %s)', async (address) => {
+    dnsLookupMock.mockResolvedValue([{ address, family: 6 }] as never);
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    await expect(source.score({ url: 'https://blocked-v6.example' })).rejects.toThrow(
+      /private\/internal address/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('allows a URL that resolves to a public IPv6 address through to fetch', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '2606:4700:4700::1111', family: 6 }] as never);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: async () => '<html></html>',
+    } as unknown as Response);
+    mockToolResponse(ALL_CATEGORIES_MEDIUM);
+    const source = new LLMJudgeSource('v1', tmpCacheDir);
+
+    const findings = await source.score({ url: 'https://public-v6.example' });
+
+    expect(findings).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalled();
     fetchMock.mockRestore();
   });
 

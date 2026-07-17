@@ -30,13 +30,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import importlib.resources
+import ipaddress
 import json
 import os
+import re
+import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from anthropic import Anthropic
 
@@ -88,12 +92,24 @@ class Rubric:
     categories: List[RubricCategory]
 
 
+# rubric_name is joined straight into a package-resource path below --
+# restricting it to a bare name (no separators or ".." segments) before that
+# join closes off path traversal for any caller that ever wires --rubric to
+# something other than a maintainer-chosen local flag.
+_RUBRIC_NAME_PATTERN = re.compile(r"^[\w-]+$")
+
+
 def load_rubric(rubric_name: str) -> Rubric:
     """
     Loads slop_eval/rubric/<rubric_name>.json, bundled inside the installed
     package (via importlib.resources, not a repo-relative filesystem path,
     since a pip-installed wheel has no source checkout to resolve against).
     """
+    if not _RUBRIC_NAME_PATTERN.match(rubric_name):
+        raise RubricLoadError(
+            f'Rubric name "{rubric_name}" is invalid -- expected letters, digits, "-", or "_" only.'
+        )
+
     resource = importlib.resources.files("slop_eval").joinpath("rubric", f"{rubric_name}.json")
 
     if not resource.is_file():
@@ -182,7 +198,57 @@ class LLMJudgeSource:
 
         raise RuntimeError('ScoreInput requires either "url" or "screenshot_path" to be set.')
 
+    @staticmethod
+    def _assert_url_is_safe_to_fetch(url: str) -> None:
+        """
+        Blocks SSRF/local-file-read into internal targets before --url mode
+        fetches anything. Without a scheme check, urllib's built-in file://
+        handler turns --url into an arbitrary local-file-read primitive
+        (contents get embedded in the judge prompt and can resurface in the
+        JSON output); without an IP check, any RFC1918/loopback/link-local
+        target -- including 169.254.169.254, the AWS/GCP/Azure
+        instance-metadata endpoint, which falls under the link-local block --
+        is reachable if --url is ever wired to input an attacker can
+        influence (this tool is meant to be embedded in other people's CI via
+        the bundled GitHub Action).
+
+        This validates the resolved IP at lookup time, not at connection
+        time, so it does not fully close a DNS-rebinding attack (a name that
+        resolves to a public IP during this check but a private one when
+        urlopen actually connects) -- fully closing that requires a custom
+        socket factory that re-validates the IP it connects to, out of scope
+        for this fix.
+        """
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise RuntimeError(
+                f"Could not fetch URL {url}: only http/https URLs are supported for --url mode "
+                f'(got "{parsed.scheme}").'
+            )
+        hostname = parsed.hostname
+        if not hostname or hostname.lower() == "metadata.google.internal":
+            raise RuntimeError(f'Could not fetch URL {url}: host "{hostname}" is not allowed for --url mode.')
+        try:
+            resolved = {info[4][0] for info in socket.getaddrinfo(hostname, None)}
+        except socket.gaierror as err:
+            raise RuntimeError(f'Could not fetch URL {url}: could not resolve host "{hostname}": {err}') from err
+        for ip_str in resolved:
+            ip = ipaddress.ip_address(ip_str)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+                or ip.is_unspecified
+            ):
+                raise RuntimeError(
+                    f'Could not fetch URL {url}: host "{hostname}" resolves to a private/internal address '
+                    f"({ip_str}), which is not allowed for --url mode."
+                )
+
     def _fetch_url(self, url: str) -> str:
+        self._assert_url_is_safe_to_fetch(url)
         req = urllib.request.Request(url, headers={"User-Agent": "slop-eval-cli"})
         try:
             with urllib.request.urlopen(req, timeout=URL_FETCH_TIMEOUT_MS / 1000) as res:

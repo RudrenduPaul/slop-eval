@@ -1,6 +1,6 @@
 {
   "name": "slop-eval-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scores AI-generated UI for genericness (\"slop\") using an LLM-judge rubric. Composable RuleSource plugin architecture designed to complement deterministic rule catalogs, not replace them.",
   "keywords": [
     "ai",

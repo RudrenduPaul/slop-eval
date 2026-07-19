@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "slop-eval-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = "Scores AI-generated UI for genericness (\"slop\") using an Anthropic LLM-judge rubric, with a --json mode for CI and agent quality gates."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -10,9 +10,9 @@ Score AI-generated UI for genericness with an LLM judge, so a CI check catches t
 slop-eval score --screenshot ./preview.png --json
 ```
 
-## Two distributions: npm (live) and Python (publish in progress)
+## Two distributions: npm and Python, both live
 
-`slop-eval-cli` is live on npm -- `npx slop-eval-cli score ...` works today (see [Quickstart](#quickstart) below). A genuine Python port also ships in this repo under [`python/`](./python/) (`pip install slop-eval-cli`, package `slop_eval`), built and tested (56/56 tests) against the same rubric and Anthropic judge prompt. Its first PyPI publish is in progress -- this notice will drop the moment `pip install slop-eval-cli` is live. See [`python/README.md`](./python/README.md) for Python-specific usage in the meantime.
+`slop-eval-cli` is live on both npm (`npx slop-eval-cli score ...`, see [Quickstart](#quickstart) below) and PyPI (`pip install slop-eval-cli`, package `slop_eval`). The Python port is a genuine port, not a wrapper, built and tested (56/56 tests) against the same rubric and Anthropic judge prompt as the TypeScript original. See [`python/README.md`](./python/README.md) for Python-specific usage.
 
 ## Why this exists, and what it isn't
 
@@ -43,6 +43,8 @@ Verified against the code in this repo, not aspirational:
 
 Requires Node.js 18+ and an `ANTHROPIC_API_KEY` (BYO key; get one at [console.anthropic.com](https://console.anthropic.com/)).
 
+![Terminal recording: cloning slop-eval, installing dependencies, building the CLI, running --help, then running a first score without ANTHROPIC_API_KEY set, showing the real fail-fast error message that tells you how to set the key](./docs/demo.gif)
+
 ```bash
 git clone https://github.com/RudrenduPaul/slop-eval.git
 cd slop-eval
@@ -53,7 +55,9 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 ./dist/cli.js score --screenshot ./test/fixtures/sample.png
 ```
 
-For CI or agent consumption, add `--json`:
+For CI or agent consumption, add `--json`. `--json` always emits a valid JSON object on stdout, on both the success and error paths, and the `--url`/`--screenshot` mutual-exclusivity check is a good example of a real usage-error path you can rely on being parseable:
+
+![Terminal recording: running score with --json to show the structured JSON error object on stdout, then passing both --url and --screenshot together to show the mutually-exclusive usage error, also returned as valid JSON](./docs/usage.gif)
 
 ```bash
 ./dist/cli.js score --screenshot ./test/fixtures/sample.png --json
@@ -152,20 +156,6 @@ A slop-eval score is a heuristic quality signal from one LLM's read of your UI a
 
 Every score is graded against `src/rubric/v1.json`, a real, versioned, inspectable file, not a black box. Read it, propose changes, or pin a specific version with `--rubric`. A rubric version is never edited in place; a change ships as a new file so a historical score always records which rubric produced it.
 
-## FAQ
-
-**Does this replace Impeccable's Slop catalog or aislop?** No. It targets a different signal (holistic layout/component judgment vs. fixed visual-tell rules) and is built to run alongside them in the same CI job.
-
-**Do I need an API key?** Yes. slop-eval is bring-your-own-key against the Anthropic API; there's no shared or hosted key. Nothing is sent anywhere except Anthropic's API.
-
-**Can I use a different model provider (OpenAI, Gemini)?** Not in v0.1. `LLMJudgeSource` calls the Anthropic API directly; `ANTHROPIC_MODEL` only lets you pick a different Anthropic model. A pluggable provider is a natural fit for the `RuleSource` interface later, but it isn't built yet, so don't take "composable rule sources" to mean "multi-provider" today.
-
-**Does `--url` render the page like a browser would?** No, not in v0.1. It fetches the raw HTML/text response and hands that to the judge as a fallback. Render the page yourself and pass `--screenshot` for a real visual read.
-
-**Will re-running slop-eval on the same PR flap the CI check?** No. Identical input (same screenshot bytes, or same URL plus fetched content) hits the content-hash cache in `src/cache/judge-cache.ts` and never re-calls the API, so the same input always returns the same cached result.
-
-**Is `screenshot-diff-vs-corpus` a real check today?** No. It's a real `RuleSource` implementation in the code, but v0.1 ships it as an honest `not_scored` stub because no labeled comparison corpus exists yet. Hand-seeding an unvalidated corpus would be a less honest signal than reporting "not scored." Corpus-backed diffing is planned for v0.2.
-
 ## Roadmap
 
 - **v0.1 (this release):** LLM-judge scoring, CLI, GitHub Action, content-hash caching, `--json` mode.
@@ -174,6 +164,26 @@ Every score is graded against `src/rubric/v1.json`, a real, versioned, inspectab
 ## Security
 
 `ANTHROPIC_API_KEY` is read from the environment only, is never logged, and is never written to the content-hash cache -- see `SECURITY.md` for the full policy and the private disclosure process.
+
+## FAQ
+
+**What is slop-eval, and how is it different from a linter?** It's a CLI and GitHub Action that scores AI-generated UI for genericness ("slop") using an Anthropic LLM judge against a versioned rubric (`src/rubric/v1.json`), instead of a fixed set of deterministic pattern checks. It's built to catch the "this looks like every other AI-built app" read a human reviewer gives on sight, and to run alongside a deterministic linter in the same CI job or agent loop, not replace one.
+
+**Do I need an API key?** Yes. slop-eval is bring-your-own-key against the Anthropic API; there's no shared or hosted key. Nothing is sent anywhere except Anthropic's API.
+
+**How do I install it, and what platforms does it support?** Two independent distributions. npm: `npx slop-eval-cli score ...` or `npm install -g slop-eval-cli`, requiring Node.js 18+ (see `engines` in `package.json`). PyPI: `pip install slop-eval-cli`, requiring Python 3.9-3.13 (see the classifiers in `python/pyproject.toml`). Neither package has a native binary or a platform-specific build step, so both install the same way on macOS, Linux, and Windows.
+
+**How does slop-eval compare to Impeccable's Slop catalog specifically?** See the [Honest comparison](#honest-comparison) table above for the full breakdown. In short: Impeccable's core is 41 deterministic checks (of 46 total) that need no API key and run near-instantly; slop-eval is a single LLM-judge call that needs a BYO Anthropic key and is slower by design, because a real model call sits in the critical path, in exchange for holistic layout/component judgment a fixed rule can't easily encode. They're built to run together in the same CI job, not to compete for the same slot.
+
+**Can I use a different model provider (OpenAI, Gemini)?** Not in v0.1. `LLMJudgeSource` calls the Anthropic API directly; `ANTHROPIC_MODEL` only lets you pick a different Anthropic model. A pluggable provider is a natural fit for the `RuleSource` interface later, but it isn't built yet, so don't take "composable rule sources" to mean "multi-provider" today.
+
+**Does `--url` render the page like a browser would, and what if my score run fails?** No, not in v0.1. `--url` fetches the raw HTML/text response and hands that to the judge as a fallback; render the page yourself and pass `--screenshot` for a real visual read. For failures generally: every error path, including a missing `ANTHROPIC_API_KEY`, exits with code `2` and prints a clear message (a JSON `{"error": ...}` object in `--json` mode), so a failed run should always tell you exactly what to fix.
+
+**Will re-running slop-eval on the same PR flap the CI check?** No. Identical input (same screenshot bytes, or same URL plus fetched content) hits the content-hash cache in `src/cache/judge-cache.ts` and never re-calls the API, so the same input always returns the same cached result.
+
+**Is `screenshot-diff-vs-corpus` a real check today?** No. It's a real `RuleSource` implementation in the code, but v0.1 ships it as an honest `not_scored` stub because no labeled comparison corpus exists yet. Hand-seeding an unvalidated corpus would be a less honest signal than reporting "not scored." Corpus-backed diffing is planned for v0.2.
+
+**Can I use slop-eval commercially, including in a closed-source product?** Yes. Both distributions are Apache 2.0 (`LICENSE`, `python/LICENSE`), a permissive license that allows commercial use, modification, and closed-source redistribution, and includes an express patent grant. Calling the CLI or Action from a closed-source project doesn't obligate you to open anything up; the license and copyright notice just need to ship with redistributed copies of slop-eval's own code.
 
 ## Contributing
 

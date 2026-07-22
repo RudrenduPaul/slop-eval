@@ -21,7 +21,10 @@
     "url": "git+https://github.com/RudrenduPaul/slop-eval.git"
   },
   "license": "Apache-2.0",
-  "author": "",
+  "author": "Rudrendu Paul",
+  "contributors": [
+    "Sourav Nandy"
+  ],
   "bin": {
     "slop-eval": "./dist/cli.js"
   },

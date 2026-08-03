@@ -20,7 +20,7 @@ Nutlope's Hallmark, a popular AI design skill with 3.5k+ stars, has an open issu
 
 slop-eval is not the first tool in this space, and it doesn't try to be. Two real, free tools already sit nearby:
 
-- **[Impeccable's Slop catalog](https://impeccable.style/slop/)** ships a CLI that flags 46 specific visual tells of AI-generated UI (gradient palettes, glassmorphism, side-stripe borders, WCAG contrast violations). 41 of those 46 checks run as deterministic rules with no model call; a separate `impeccable critique` command adds an opt-in LLM review pass. Core detection stays fast because it doesn't need a model for most of its checks.
+- **[Impeccable's Slop catalog](https://impeccable.style/slop/)** ships a CLI that flags 59 specific visual tells of AI-generated UI (gradient palettes, glassmorphism, side-stripe borders, WCAG contrast violations), all enabled by default with no model call; a separate `impeccable critique` command adds 5 further, opt-in LLM judgments. Core detection stays fast because it doesn't need a model for any of its default checks.
 - **[aislop](https://github.com/scanaislop/aislop)** does the deterministic, rule-based equivalent for AI-generated *code* (not UI): 50+ regex/AST rules across 8 languages, no LLM in the runtime path, positioned exactly as a CI quality gate.
 
 Neither does holistic, judgment-based UI scoring: "does this layout feel novel," "does this component choice feel considered," the kind of read a fixed rule can't easily encode. That's the gap slop-eval fills, built to compose with tools like Impeccable's rather than replace them.
@@ -129,8 +129,8 @@ Posts a PR comment leading with the most specific flagged finding, then the comp
 | | slop-eval | Impeccable (Slop) | aislop |
 |---|---|---|---|
 | Target | AI-generated **UI** | AI-generated **UI** | AI-generated **code** |
-| Detection method | LLM judge (holistic) | Deterministic rules, 41 of 46 checks; separate `critique` command adds LLM review | Deterministic rules (50+ checks) |
-| Requires an API key | Yes (BYO Anthropic key) | No, for the core 41 deterministic checks | No |
+| Detection method | LLM judge (holistic) | Deterministic rules, 59 checks by default; separate `critique` command adds 5 LLM judgments | Deterministic rules (50+ checks) |
+| Requires an API key | Yes (BYO Anthropic key) | No, for the 59 default deterministic checks | No |
 | Speed | Slower by design, a real model call is in the critical path | Near-instant for the deterministic checks | Sub-second, no network call |
 | Composable rule sources | Yes, `RuleSource` plugin interface | No (fixed rule set) | No (fixed rule set) |
 | License | Apache 2.0 | Not stated on the product page as of this check | MIT |
@@ -173,7 +173,7 @@ Every score is graded against `src/rubric/v1.json`, a real, versioned, inspectab
 
 **How do I install it, and what platforms does it support?** Two independent distributions. npm: `npx slop-eval-cli score ...` or `npm install -g slop-eval-cli`, requiring Node.js 18+ (see `engines` in `package.json`). PyPI: `pip install slop-eval-cli`, requiring Python 3.9-3.13 (see the classifiers in `python/pyproject.toml`). Neither package has a native binary or a platform-specific build step, so both install the same way on macOS, Linux, and Windows.
 
-**How does slop-eval compare to Impeccable's Slop catalog specifically?** See the [Honest comparison](#honest-comparison) table above for the full breakdown. In short: Impeccable's core is 41 deterministic checks (of 46 total) that need no API key and run near-instantly; slop-eval is a single LLM-judge call that needs a BYO Anthropic key and is slower by design, because a real model call sits in the critical path, in exchange for holistic layout/component judgment a fixed rule can't easily encode. They're built to run together in the same CI job, not to compete for the same slot.
+**How does slop-eval compare to Impeccable's Slop catalog specifically?** See the [Honest comparison](#honest-comparison) table above for the full breakdown. In short: Impeccable's core is 59 deterministic checks, all enabled by default, that need no API key and run near-instantly; a separate `critique` command adds 5 further LLM judgments. slop-eval is a single LLM-judge call that needs a BYO Anthropic key and is slower by design, because a real model call sits in the critical path, in exchange for holistic layout/component judgment a fixed rule can't easily encode. They're built to run together in the same CI job, not to compete for the same slot.
 
 **Can I use a different model provider (OpenAI, Gemini)?** Not in v0.1. `LLMJudgeSource` calls the Anthropic API directly; `ANTHROPIC_MODEL` only lets you pick a different Anthropic model. A pluggable provider is a natural fit for the `RuleSource` interface later, but it isn't built yet, so don't take "composable rule sources" to mean "multi-provider" today.
 

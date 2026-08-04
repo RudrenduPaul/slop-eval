@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "slop-eval-cli"
-version = "0.1.1"
-description = "Scores AI-generated UI for genericness (\"slop\") using an Anthropic LLM-judge rubric, with a --json mode for CI and agent quality gates."
+version = "0.1.2"
+description = "Scores AI-generated UI for genericness (\"slop\") using an Anthropic LLM-judge rubric, with a --json mode for CI/agent quality gates and a documented programmatic API (score_composite, ScoreInput, LLMJudgeSource) for in-process use by agent frameworks."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
@@ -13,7 +13,7 @@ authors = [
   { name = "Rudrendu Paul" },
   { name = "Sourav Nandy" },
 ]
-keywords = ["ai", "ui", "slop", "eval", "ci", "quality-gate", "llm-judge", "design", "anthropic"]
+keywords = ["ai", "ui", "slop", "eval", "ci", "quality-gate", "llm-judge", "design", "anthropic", "agent-native", "design-review", "code-quality"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",

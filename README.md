@@ -1,12 +1,14 @@
 # slop-eval
 
-Score AI-generated UI for genericness with an LLM judge, so a CI check catches the same "this looks like every other AI-built app" problem a human reviewer would flag on sight.
-
 [![CI](https://github.com/RudrenduPaul/slop-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/RudrenduPaul/slop-eval/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/slop-eval-cli.svg)](https://www.npmjs.com/package/slop-eval-cli)
 [![PyPI version](https://img.shields.io/pypi/v/slop-eval-cli.svg)](https://pypi.org/project/slop-eval-cli/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](./package.json)
+
+[Quickstart](#quickstart) • [CLI reference](#cli-reference) • [Library API](#library-api) • [Comparison](#honest-comparison) • [FAQ](#faq)
+
+Score AI-generated UI for genericness with an LLM judge, so a CI check catches the same "this looks like every other AI-built app" problem a human reviewer would flag on sight.
 
 ![Terminal recording: cloning slop-eval, installing dependencies, building the CLI, running --help, then running a first score without ANTHROPIC_API_KEY set, showing the real fail-fast error message that tells you how to set the key](./docs/demo.gif)
 
@@ -19,23 +21,6 @@ No install step: `npx` fetches and runs the published npm package directly. Pref
 ## Two distributions: npm and Python, both live
 
 `slop-eval-cli` is live on both [npm](https://www.npmjs.com/package/slop-eval-cli) and [PyPI](https://pypi.org/project/slop-eval-cli/) (package `slop_eval`). The Python port is a genuine, independent implementation, built and tested (60/60 tests, verified in this pass) against the same rubric and Anthropic judge prompt as the TypeScript original. See [`python/README.md`](./python/README.md) for Python-specific usage.
-
-## Table of contents
-
-- [Why this exists, and what it isn't](#why-this-exists-and-what-it-isnt)
-- [Features](#features)
-- [Quickstart](#quickstart)
-- [CLI reference](#cli-reference)
-- [Library API](#library-api)
-- [GitHub Action](#github-action)
-- [Honest comparison](#honest-comparison)
-- [What a score means (and doesn't)](#what-a-score-means-and-doesnt)
-- [The rubric is public and versioned](#the-rubric-is-public-and-versioned)
-- [Roadmap](#roadmap)
-- [Security](#security)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [License](#license)
 
 ## Why this exists, and what it isn't
 
@@ -157,7 +142,8 @@ Exit codes: `0` success (no threshold, or score at/above `--fail-below`), `1` su
 
 ![Terminal recording walking the real usage-error paths: missing --url/--screenshot, both flags passed together, an unreadable file path, and a missing ANTHROPIC_API_KEY, each exiting 2 with a clear message](./docs/usage-errors.gif)
 
-**`--url` limitation (v0.1, by design):** no bundled headless browser. `--url` fetches raw HTML/text and hands it to the judge as a text fallback, reasoning over markup and copy rather than the rendered layout. `--screenshot` is the stronger signal; render the page yourself (Playwright, Puppeteer, or your CI's existing preview-screenshot step) and pass the image.
+> [!NOTE]
+> `--url` is a v0.1 limitation, by design: no bundled headless browser. It fetches raw HTML/text and hands it to the judge as a text fallback, reasoning over markup and copy rather than the rendered layout. `--screenshot` is the stronger signal; render the page yourself (Playwright, Puppeteer, or your CI's existing preview-screenshot step) and pass the image.
 
 The Python CLI (`slop-eval` console script, installed via `pip install slop-eval-cli`) exposes the identical flag set and exit-code contract, confirmed against its own `--help` output this session.
 

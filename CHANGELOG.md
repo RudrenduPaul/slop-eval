@@ -7,6 +7,29 @@ against the same versioned rubric (`v1`) and the same Anthropic
 forced-tool-call judge prompt; entries note which distribution they apply
 to.
 
+## [0.1.5] / [Python 0.1.3] - 2026-08-08
+
+### Fixed
+
+- **`slop-eval --version` reported a stale, hardcoded version number on
+  both distributions.** The npm CLI's `commander` `.version()` call was
+  hardcoded to `'0.1.0'` in `src/cli.ts` and never updated across the
+  `0.1.1`/`0.1.3`/`0.1.4` package.json bumps, so a globally-installed
+  `slop-eval-cli@0.1.4` reported `slop-eval --version` as `0.1.0` --
+  three patch versions stale, including the `0.1.1` SSRF/local-file-read
+  security fix, so users had no reliable way to confirm via `--version`
+  whether their install carried that fix. The Python port had the same
+  bug: `_VERSION = "0.1.0"` was hardcoded in `python/src/slop_eval/
+  cli.py` independently of `pyproject.toml`'s version field, so
+  `slop-eval-cli` `0.1.2` on PyPI also reported `--version` as `0.1.0`.
+  Verified live against real `npm install -g` and `pip install` runs of
+  the previously-published packages before fixing. Both hardcoded
+  strings now match their package manifests (`0.1.5` npm, `0.1.3`
+  PyPI); re-verified against fresh installs of the rebuilt packages.
+  All other CLI behavior (`--help`, argument validation, missing-API-key
+  error path, exit codes) was confirmed correct and unaffected on both
+  distributions.
+
 ## [Python 0.1.0] - 2026-07-16
 
 Initial public release of the Python port, published to PyPI as

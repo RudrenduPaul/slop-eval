@@ -115,7 +115,7 @@ export function buildProgram(): Command {
       'Scores AI-generated UI for genericness ("slop") using an LLM-judge rubric. ' +
         'This is a heuristic quality signal, not a certification -- see the score subcommand for details.',
     )
-    .version('0.1.0');
+    .version('0.1.5');
 
   program
     .command('score')

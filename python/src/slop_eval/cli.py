@@ -46,7 +46,7 @@ from .sources.base import RuleSource, ScoreInput
 from .sources.llm_judge import LLMJudgeSource
 from .sources.screenshot_diff import ScreenshotDiffSource
 
-_VERSION = "0.1.0"
+_VERSION = "0.1.3"
 
 _SCORE_DESCRIPTION = (
     "Score a URL or screenshot for AI-UI genericness against a versioned rubric.\n\n"

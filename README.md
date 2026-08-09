@@ -8,6 +8,8 @@ Score AI-generated UI for genericness with an LLM judge, so a CI check catches t
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](./package.json)
 
+![Terminal recording: cloning slop-eval, installing dependencies, building the CLI, running --help, then running a first score without ANTHROPIC_API_KEY set, showing the real fail-fast error message that tells you how to set the key](./docs/demo.gif)
+
 ```bash
 npx slop-eval-cli score --screenshot ./preview.png --json
 ```
@@ -64,8 +66,6 @@ Verified directly against the code in this repo:
 ## Quickstart
 
 Requires Node.js 18+ (npm) or Python 3.9+ (PyPI), and an `ANTHROPIC_API_KEY` (BYO key; get one at [console.anthropic.com](https://console.anthropic.com/)).
-
-![Terminal recording: cloning slop-eval, installing dependencies, building the CLI, running --help, then running a first score without ANTHROPIC_API_KEY set, showing the real fail-fast error message that tells you how to set the key](./docs/demo.gif)
 
 The fastest path, no local clone or build needed, is the one-liner at the top of this README:
 

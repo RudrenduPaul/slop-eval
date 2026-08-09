@@ -155,6 +155,8 @@ Exit codes: `0` success (no threshold, or score at/above `--fail-below`), `1` su
 
 `--url` and `--screenshot` are mutually exclusive; passing both or neither is a usage error (exit 2) in either output mode. Both verified directly against the built CLI this session.
 
+![Terminal recording walking the real usage-error paths: missing --url/--screenshot, both flags passed together, an unreadable file path, and a missing ANTHROPIC_API_KEY, each exiting 2 with a clear message](./docs/usage-errors.gif)
+
 **`--url` limitation (v0.1, by design):** no bundled headless browser. `--url` fetches raw HTML/text and hands it to the judge as a text fallback, reasoning over markup and copy rather than the rendered layout. `--screenshot` is the stronger signal; render the page yourself (Playwright, Puppeteer, or your CI's existing preview-screenshot step) and pass the image.
 
 The Python CLI (`slop-eval` console script, installed via `pip install slop-eval-cli`) exposes the identical flag set and exit-code contract, confirmed against its own `--help` output this session.

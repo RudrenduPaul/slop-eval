@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.RudrenduPaul/slop-eval-cli -->
 # slop-eval
 
 [![CI](https://github.com/RudrenduPaul/slop-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/RudrenduPaul/slop-eval/actions/workflows/ci.yml)
@@ -6,7 +7,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](./package.json)
 
-[Quickstart](#quickstart) • [CLI reference](#cli-reference) • [Library API](#library-api) • [Comparison](#honest-comparison) • [FAQ](#faq)
+[Quickstart](#quickstart) • [CLI reference](#cli-reference) • [Library API](#library-api) • [MCP Server](#mcp-server) • [Comparison](#honest-comparison) • [FAQ](#faq)
 
 Score AI-generated UI for genericness with an LLM judge, so a CI check catches the same "this looks like every other AI-built app" problem a human reviewer would flag on sight.
 
@@ -164,6 +165,36 @@ print(result.composite_score, result.findings)
 `score_composite(sources: List[RuleSource], score_input: ScoreInput) -> CompositeResult` runs every `RuleSource` in list order, flattens their findings, and returns a `CompositeResult` with `composite_score: float` (0-100) and `findings: List[RuleFinding]`. Also exported: `RuleFinding`, `RuleFindingStatus`, `RuleSource`, `Rubric`, `RubricCategory`, `load_rubric`, `build_json_report`, `render_human_report`, `print_report`, `print_error`, `MissingApiKeyError`, `RubricLoadError`.
 
 **TypeScript** (`src/cli.ts`, exported from the package's `main`/`types` entry): `runScore(options: ScoreOptions, buildSources?) => Promise<number>` and `buildProgram(): Command` are the two exported entry points, along with the `ScoreOptions` interface. `scoreComposite` (from `src/scorer/composite.ts`) is the same composite-scoring function the CLI calls internally. These exist primarily so the test suite can drive the CLI in-process; the Python package's `__init__.py` is the more deliberately documented "agent-native" library surface of the two.
+
+## MCP Server
+
+slop-eval ships a Model Context Protocol server, so an MCP-compatible agent (Claude Desktop, Claude Code, Cursor, an orchestrator) can call slop-eval directly as a tool instead of shelling out to the CLI and parsing stdout itself.
+
+```bash
+pip install "slop-eval-cli[mcp]"
+```
+
+Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "slop-eval": {
+      "command": "slop-eval-mcp",
+      "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+    }
+  }
+}
+```
+
+The server exposes one tool, `run(args: list[str]) -> dict`, a generic wrapper around the CLI: pass it the same argv you'd pass on the command line (minus the leading `slop-eval`), and it returns the CLI's parsed JSON output, or a structured `{"error": ...}` dict on a non-zero exit, a timeout, or a subprocess failure -- the tool call itself never raises. Example:
+
+```python
+run(["score", "--screenshot", "./preview.png", "--json"])
+# -> {"result": {"target": "./preview.png", "rubric": "v1", "compositeScore": 62.0, "findings": [...], ...}}
+```
+
+Start it directly with `slop-eval-mcp` (stdio transport). Requires Python 3.9+ for the base package; the `mcp` extra itself needs `mcp>=2.0.0`.
 
 ## GitHub Action
 

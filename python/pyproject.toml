@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "slop-eval-cli"
-version = "0.1.3"
+version = "0.1.4"
 description = "Scores AI-generated UI for genericness (\"slop\") using an Anthropic LLM-judge rubric, with a --json mode for CI/agent quality gates and a documented programmatic API (score_composite, ScoreInput, LLMJudgeSource) for in-process use by agent frameworks."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -13,7 +13,7 @@ authors = [
   { name = "Rudrendu Paul" },
   { name = "Sourav Nandy" },
 ]
-keywords = ["ai", "ui", "slop", "eval", "ci", "quality-gate", "llm-judge", "design", "anthropic", "agent-native", "design-review", "code-quality"]
+keywords = ["ai", "ui", "slop", "eval", "ci", "quality-gate", "llm-judge", "design", "anthropic", "agent-native", "design-review", "code-quality", "mcp", "agent-tooling"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -39,6 +39,14 @@ dev = [
   "build>=1.0,<2",
   "twine>=5.0,<7",
 ]
+# Agent-native MCP server mode (`slop-eval-mcp`). Not a hard dependency --
+# most installs never use MCP mode. Install with
+# `pip install "slop-eval-cli[mcp]"`. Pinned to >=2.0.0: mcp_server.py uses
+# `mcp.server.MCPServer`, which replaced `mcp.server.fastmcp.FastMCP` in
+# the 2.0.0 release -- verified directly against the installed package.
+mcp = [
+  "mcp[cli]>=2.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/RudrenduPaul/slop-eval"
@@ -51,6 +59,10 @@ Documentation = "https://github.com/RudrenduPaul/slop-eval/blob/main/python/docs
 
 [project.scripts]
 slop-eval = "slop_eval.cli:main"
+slop-eval-mcp = "slop_eval.mcp_server:main"
+
+[tool.hatch.build]
+exclude = [".venv*/"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/slop_eval"]

@@ -7,6 +7,20 @@ against the same versioned rubric (`v1`) and the same Anthropic
 forced-tool-call judge prompt; entries note which distribution they apply
 to.
 
+## [0.1.6] / [Python 0.1.6] - 2026-09-24
+
+### Changed
+
+- **npm runtime dependency upgraded:** `@anthropic-ai/sdk` `^0.111.0` to
+  `^0.128.0`. `commander` stays on `^15.0.0`. Dev toolchain moved to
+  TypeScript 6, ESLint 10 and `vitest` 4.1.11.
+- **Publishing moves to npm Trusted Publishing** (GitHub Actions OIDC, no
+  long-lived npm token). The release workflow pins npm 11 and Node 24.
+- The Python distribution carries the same version number so both
+  registries stay in step on a single release. It has no code changes.
+- Known limit, unchanged in this release: `commander` 15 requires Node
+  22.12 or newer, while `engines.node` still declares `>=18`.
+
 ## [0.1.5] / [Python 0.1.3] - 2026-08-08
 
 ### Fixed

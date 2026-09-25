@@ -12,14 +12,16 @@ to.
 ### Changed
 
 - **npm runtime dependency upgraded:** `@anthropic-ai/sdk` `^0.111.0` to
-  `^0.128.0`. `commander` stays on `^15.0.0`. Dev toolchain moved to
-  TypeScript 6, ESLint 10 and `vitest` 4.1.11.
+  `^0.128.0`. Dev toolchain moved to TypeScript 6, ESLint 10 and `vitest`
+  4.1.11.
+- **`commander` pinned to `^13.1.0`** (was `^15.0.0`). `commander` 15
+  requires Node 22.12 or newer, while `engines.node` declares `>=18`;
+  `commander` 13 declares `node >=18`, so installs and runs on Node 18 to
+  22.11 are supported again.
 - **Publishing moves to npm Trusted Publishing** (GitHub Actions OIDC, no
   long-lived npm token). The release workflow pins npm 11 and Node 24.
 - The Python distribution carries the same version number so both
   registries stay in step on a single release. It has no code changes.
-- Known limit, unchanged in this release: `commander` 15 requires Node
-  22.12 or newer, while `engines.node` still declares `>=18`.
 
 ## [0.1.5] / [Python 0.1.3] - 2026-08-08
 
